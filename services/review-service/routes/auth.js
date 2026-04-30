@@ -3,6 +3,7 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const Joi     = require('joi');
 const { createUser, findUserByEmail } = require('../models/user');
+const logger  = require('../config/logger');
 
 const registerSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(50).required(),
@@ -36,8 +37,10 @@ router.post('/register', async (req, res) => {
     const user  = await createUser({ ...value, passwordHash });
     const token = signToken(user);
 
+    logger.info('User registered', { userId: user.id, username: user.username });
     res.status(201).json({ token, user });
   } catch (err) {
+    logger.error('Registration failed', { error: err.message });
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -49,14 +52,22 @@ router.post('/login', async (req, res) => {
 
   try {
     const user = await findUserByEmail(value.email);
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user) {
+      logger.warn('Login failed - email not found', { email: value.email });
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
     const match = await bcrypt.compare(value.password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!match) {
+      logger.warn('Login failed - wrong password', { userId: user.id });
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
     const token = signToken(user);
+    logger.info('User logged in', { userId: user.id, username: user.username });
     res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
   } catch (err) {
+    logger.error('Login failed', { error: err.message });
     res.status(500).json({ error: 'Login failed' });
   }
 });
