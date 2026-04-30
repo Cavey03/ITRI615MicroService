@@ -1,4 +1,5 @@
-// Step 8: Review routes — placeholder
-// GET    /movies/:id/reviews
-// POST   /movies/:id/reviews  (critic or viewer)
-// DELETE /reviews/:id         (owner or admin)
+const router = require('express').Router();
+
+// Step 8: Review CRUD routes go here
+
+module.exports = router;

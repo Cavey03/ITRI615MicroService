@@ -1,3 +1,5 @@
-// Step 4: Auth routes — placeholder
-// POST /auth/register
-// POST /auth/login
+const router = require('express').Router();
+
+// Step 4: POST /auth/register and POST /auth/login go here
+
+module.exports = router;
