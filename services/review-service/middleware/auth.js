@@ -9,7 +9,7 @@ function requireAuth(req, res, next) {
 
   const token = header.split(' ')[1];
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     next();
   } catch (err) {
     logger.warn('Invalid or expired token', { error: err.message });

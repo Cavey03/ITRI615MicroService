@@ -7,12 +7,12 @@ const logger  = require('../config/logger');
 
 const registerSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(50).required(),
-  email:    Joi.string().email().required(),
+  email:    Joi.string().email().lowercase().required(),
   password: Joi.string().min(8).max(72).required(),
 });
 
 const loginSchema = Joi.object({
-  email:    Joi.string().email().required(),
+  email:    Joi.string().email().lowercase().required(),
   password: Joi.string().required(),
 });
 
@@ -20,7 +20,7 @@ function signToken(user) {
   return jwt.sign(
     { id: user.id, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '8h', algorithm: 'HS256' }
   );
 }
 
