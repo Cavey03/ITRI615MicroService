@@ -1,6 +1,6 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-const requiredEnv = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET'];
+const requiredEnv = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'TMDB_API_KEY'];
 const missing = requiredEnv.filter(v => !process.env[v]);
 if (missing.length) {
   console.error(`Missing required environment variables: ${missing.join(', ')}`);
