@@ -39,7 +39,7 @@ app.use(requestLogger);
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // max requests per IP
-  message: "Too many requests, please try again later",
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 app.use(limiter);
@@ -65,7 +65,7 @@ app.use((err, req, res, next) => {
   console.error(err);
 
   res.status(err.status || 500).json({
-    message: err.message || "Internal server error"
+    error: err.message || 'Internal server error',
   });
 });
 
