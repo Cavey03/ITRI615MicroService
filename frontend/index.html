@@ -113,6 +113,15 @@
       border-top: 1px solid #333;
       padding: 1rem 0;
     }
+
+    .error-msg {
+      color: #ff6b6b;
+      margin-top: 0.5rem;
+    }
+
+    .user-greeting {
+      margin-right: 1rem;
+    }
   </style>
 </head>
 
@@ -121,6 +130,7 @@
 <header>
   <h1>Movie Review Hub</h1>
   <div>
+    <span id="userGreeting" class="user-greeting hidden"></span>
     <button id="loginBtn">Login</button>
     <button id="registerBtn">Register</button>
     <button id="logoutBtn" class="hidden">Logout</button>
@@ -138,12 +148,13 @@
     <input type="password" id="password" placeholder="Password"/>
 
     <button id="authSubmitBtn">Submit</button>
+    <div id="authError" class="error-msg"></div>
   </div>
 
   <!-- SEARCH -->
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="Search movies..."/>
-    <button onclick="searchMovies()">Search</button>
+    <button id="searchBtn">Search</button>
   </div>
 
   <!-- MOVIES -->
@@ -155,7 +166,7 @@
 <div id="movieModal" class="modal hidden">
   <div class="modal-content" id="modalContent">
 
-    <button onclick="closeModal()">Close</button>
+    <button id="closeModalBtn">Close</button>
 
     <div id="movieDetails"></div>
 
@@ -169,7 +180,8 @@
 
       <textarea id="comment" placeholder="Write review..."></textarea>
 
-      <button onclick="submitReview()">Submit</button>
+      <button id="submitReviewBtn">Submit</button>
+      <div id="reviewError" class="error-msg"></div>
     </div>
 
   </div>
@@ -177,130 +189,112 @@
 
 <script>
 
-const API_BASE = "http://localhost:3000";
-
-const fakeMovies = [
-  { id: 550, title: "Fight Club", poster: "https://via.placeholder.com/300x450?text=Fight+Club" },
-  { id: 680, title: "Pulp Fiction", poster: "https://via.placeholder.com/300x450?text=Pulp+Fiction" },
-  { id: 13, title: "Forrest Gump", poster: "https://via.placeholder.com/300x450?text=Forrest+Gump" }
-];
+const API_BASE = "http://localhost:8080";
 
 let currentMovieId = null;
 let authMode = "login";
 
-/* ratings */
-for (let i = 1; i <= 10; i++) {
-  document.getElementById("rating").innerHTML += `<option value="${i}">${i}</option>`;
+// ============================================================
+// SAFE RENDERING HELPERS
+// Using textContent / createElement avoids HTML injection (XSS)
+// when displaying user-supplied content like reviews or titles.
+// ============================================================
+function el(tag, opts = {}) {
+  const node = document.createElement(tag);
+  if (opts.text != null) node.textContent = opts.text;
+  if (opts.className) node.className = opts.className;
+  if (opts.attrs) {
+    for (const [k, v] of Object.entries(opts.attrs)) node.setAttribute(k, v);
+  }
+  return node;
 }
 
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+// ============================================================
+// AUTH STATE
+// ============================================================
 function getToken() {
   return localStorage.getItem("token");
 }
 
+function getUser() {
+  const raw = localStorage.getItem("user");
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ============================================================
+// MODAL
+// ============================================================
 function closeModal() {
   document.getElementById("movieModal").classList.add("hidden");
   currentMovieId = null;
 }
 
-/* click outside modal closes */
-document.getElementById("movieModal").addEventListener("click", (e) => {
-  if (e.target.id === "movieModal") {
-    closeModal();
-  }
+// ============================================================
+// STUBS — wired up in later commits
+// ============================================================
+async function login() { /* commit 2 */ }
+async function register() { /* commit 2 */ }
+function logout() { /* commit 2 */ }
+async function loadPopular() { /* commit 3 */ }
+async function searchMovies() { /* commit 3 */ }
+async function openMovie(id, title) { /* commit 4 */ }
+async function loadReviews(movieId) { /* commit 4 */ }
+async function submitReview() { /* commit 4 */ }
+
+// ============================================================
+// RATING OPTIONS (1-10)
+// ============================================================
+const ratingSel = document.getElementById("rating");
+for (let i = 1; i <= 10; i++) {
+  const opt = el("option", { text: String(i) });
+  opt.value = i;
+  ratingSel.appendChild(opt);
+}
+
+// ============================================================
+// EVENT BINDINGS
+// (No inline onclick — avoids string-interpolation injection
+//  attacks via movie titles or other dynamic content.)
+// ============================================================
+document.getElementById("loginBtn").addEventListener("click", () => {
+  authMode = "login";
+  document.getElementById("authTitle").textContent = "Login";
+  document.getElementById("username").classList.add("hidden");
+  document.getElementById("authSection").classList.remove("hidden");
 });
 
-/* search */
-function searchMovies() {
-  const q = document.getElementById("searchInput").value.toLowerCase();
-  const container = document.getElementById("movies");
-  container.innerHTML = "";
+document.getElementById("registerBtn").addEventListener("click", () => {
+  authMode = "register";
+  document.getElementById("authTitle").textContent = "Register";
+  document.getElementById("username").classList.remove("hidden");
+  document.getElementById("authSection").classList.remove("hidden");
+});
 
-  fakeMovies
-    .filter(m => m.title.toLowerCase().includes(q))
-    .forEach(movie => {
-      container.innerHTML += `
-        <div class="movie-card">
-          <img src="${movie.poster}">
-          <h3>${movie.title}</h3>
-          <button onclick="openMovie(${movie.id}, '${movie.title}')">
-            View Reviews
-          </button>
-        </div>
-      `;
-    });
-}
+document.getElementById("logoutBtn").addEventListener("click", () => logout());
 
-/* open movie */
-async function openMovie(id, title) {
-  currentMovieId = id;
+document.getElementById("authSubmitBtn").addEventListener("click", () => {
+  if (authMode === "login") login();
+  else register();
+});
 
-  document.getElementById("movieModal").classList.remove("hidden");
+document.getElementById("searchBtn").addEventListener("click", () => searchMovies());
 
-  document.getElementById("movieDetails").innerHTML = `<h2>${title}</h2>`;
+document.getElementById("closeModalBtn").addEventListener("click", () => closeModal());
 
-  await loadReviews(id);
-}
+document.getElementById("submitReviewBtn").addEventListener("click", () => submitReview());
 
-/* load reviews */
-async function loadReviews(movieId) {
-  try {
-    const res = await fetch(`${API_BASE}/reviews/${movieId}`);
-    const data = await res.json();
+document.getElementById("movieModal").addEventListener("click", (e) => {
+  if (e.target.id === "movieModal") closeModal();
+});
 
-    const div = document.getElementById("reviews");
-    div.innerHTML = "";
-
-    if (!data.length) {
-      div.innerHTML = "<p>No reviews yet.</p>";
-      return;
-    }
-
-    data.forEach(r => {
-      div.innerHTML += `
-        <div class="review">
-          <b>${r.rating}/10</b>
-          <p>${r.body || ""}</p>
-        </div>
-      `;
-    });
-
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-/* submit review */
-async function submitReview() {
-  const token = getToken();
-  if (!token) return alert("Login first");
-
-  const rating = document.getElementById("rating").value;
-  const comment = document.getElementById("comment").value;
-
-  const res = await fetch(`${API_BASE}/reviews`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      movieId: currentMovieId,
-      rating: Number(rating),
-      comment
-    })
-  });
-
-  const data = await res.json();
-
-  if (res.ok) {
-    alert("Review added");
-    loadReviews(currentMovieId);
-  } else {
-    alert(JSON.stringify(data));
-  }
-}
-
-searchMovies();
+// ============================================================
+// INITIAL LOAD
+// ============================================================
+loadPopular();
 
 </script>
 
