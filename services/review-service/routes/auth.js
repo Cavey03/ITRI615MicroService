@@ -5,10 +5,20 @@ const Joi     = require('joi');
 const { createUser, findUserByEmail } = require('../models/user');
 const logger  = require('../config/logger');
 
+// Password must contain at least one lowercase, uppercase, digit, and special character.
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,72}$/;
+
 const registerSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(50).required(),
   email:    Joi.string().email().lowercase().required(),
-  password: Joi.string().min(8).max(72).required(),
+  password: Joi.string()
+    .pattern(PASSWORD_PATTERN)
+    .required()
+    .messages({
+      'string.pattern.base':
+        'Password must be 8-72 characters and include uppercase, lowercase, a number, and a special character',
+      'any.required': 'Password is required',
+    }),
 });
 
 const loginSchema = Joi.object({

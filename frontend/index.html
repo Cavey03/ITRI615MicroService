@@ -147,6 +147,10 @@
     <input type="email" id="email" placeholder="Email"/>
     <input type="password" id="password" placeholder="Password"/>
 
+    <small id="passwordHint" class="hidden" style="display:block; color:#aaa; margin-top:-0.5rem; margin-bottom:1rem;">
+      Min 8 characters with uppercase, lowercase, a number, and a special character.
+    </small>
+
     <button id="authSubmitBtn">Submit</button>
     <div id="authError" class="error-msg"></div>
   </div>
@@ -234,11 +238,131 @@ function closeModal() {
 }
 
 // ============================================================
-// STUBS — wired up in later commits
+// AUTH UI STATE
 // ============================================================
-async function login() { /* commit 2 */ }
-async function register() { /* commit 2 */ }
-function logout() { /* commit 2 */ }
+function applyAuthState() {
+  const user = getUser();
+  const loginBtn    = document.getElementById("loginBtn");
+  const registerBtn = document.getElementById("registerBtn");
+  const logoutBtn   = document.getElementById("logoutBtn");
+  const greeting    = document.getElementById("userGreeting");
+  const authSection = document.getElementById("authSection");
+
+  if (user) {
+    loginBtn.classList.add("hidden");
+    registerBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+    greeting.textContent = `Hi, ${user.username}`;
+    greeting.classList.remove("hidden");
+    authSection.classList.add("hidden");
+  } else {
+    loginBtn.classList.remove("hidden");
+    registerBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+    greeting.textContent = "";
+    greeting.classList.add("hidden");
+  }
+}
+
+function setAuthError(msg) {
+  document.getElementById("authError").textContent = msg || "";
+}
+
+function clearAuthForm() {
+  document.getElementById("username").value = "";
+  document.getElementById("email").value    = "";
+  document.getElementById("password").value = "";
+  setAuthError("");
+}
+
+// ============================================================
+// LOGIN / REGISTER / LOGOUT
+// ============================================================
+async function login() {
+  setAuthError("");
+  const email    = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!email || !password) {
+    setAuthError("Email and password are required");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setAuthError(data.error || "Login failed");
+      return;
+    }
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user",  JSON.stringify(data.user));
+    clearAuthForm();
+    applyAuthState();
+  } catch (err) {
+    setAuthError("Network error — is the gateway running?");
+  }
+}
+
+// Mirrors the server-side rule in routes/auth.js — defence in depth.
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,72}$/;
+const USERNAME_PATTERN = /^[A-Za-z0-9]{3,50}$/;
+
+async function register() {
+  setAuthError("");
+  const username = document.getElementById("username").value.trim();
+  const email    = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!username || !email || !password) {
+    setAuthError("Username, email, and password are required");
+    return;
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    setAuthError("Username must be 3-50 characters, letters and numbers only");
+    return;
+  }
+
+  if (!PASSWORD_PATTERN.test(password)) {
+    setAuthError("Password must be 8-72 chars and include uppercase, lowercase, a number, and a special character");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setAuthError(data.error || "Registration failed");
+      return;
+    }
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user",  JSON.stringify(data.user));
+    clearAuthForm();
+    applyAuthState();
+  } catch (err) {
+    setAuthError("Network error — is the gateway running?");
+  }
+}
+
+function logout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  applyAuthState();
+}
+
 async function loadPopular() { /* commit 3 */ }
 async function searchMovies() { /* commit 3 */ }
 async function openMovie(id, title) { /* commit 4 */ }
@@ -264,6 +388,7 @@ document.getElementById("loginBtn").addEventListener("click", () => {
   authMode = "login";
   document.getElementById("authTitle").textContent = "Login";
   document.getElementById("username").classList.add("hidden");
+  document.getElementById("passwordHint").classList.add("hidden");
   document.getElementById("authSection").classList.remove("hidden");
 });
 
@@ -271,6 +396,7 @@ document.getElementById("registerBtn").addEventListener("click", () => {
   authMode = "register";
   document.getElementById("authTitle").textContent = "Register";
   document.getElementById("username").classList.remove("hidden");
+  document.getElementById("passwordHint").classList.remove("hidden");
   document.getElementById("authSection").classList.remove("hidden");
 });
 
@@ -294,6 +420,7 @@ document.getElementById("movieModal").addEventListener("click", (e) => {
 // ============================================================
 // INITIAL LOAD
 // ============================================================
+applyAuthState();
 loadPopular();
 
 </script>
