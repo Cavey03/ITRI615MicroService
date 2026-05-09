@@ -1,6 +1,308 @@
-<!-- Step 9: Frontend — placeholder -->
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Movie Review App</title></head>
-<body><p>Frontend coming in Step 9.</p></body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Movie Review Hub</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
+    }
+
+    header {
+      background-color: #1f1f1f;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 { margin: 0; }
+
+    button {
+      padding: 0.6rem 1rem;
+      border: none;
+      border-radius: 6px;
+      background-color: #e50914;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover { opacity: 0.9; }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 0.7rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background-color: #1e1e1e;
+      color: white;
+    }
+
+    .container { padding: 2rem; }
+
+    .search-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .movie-card {
+      background-color: #1d1d1d;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .movie-card img {
+      width: 100%;
+      height: 320px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .auth-box {
+      max-width: 400px;
+      margin-bottom: 2rem;
+      background-color: #1d1d1d;
+      padding: 1.5rem;
+      border-radius: 10px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .modal-content {
+      background-color: #1d1d1d;
+      padding: 2rem;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .review {
+      border-top: 1px solid #333;
+      padding: 1rem 0;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Movie Review Hub</h1>
+  <div>
+    <button id="loginBtn">Login</button>
+    <button id="registerBtn">Register</button>
+    <button id="logoutBtn" class="hidden">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- AUTH -->
+  <div id="authSection" class="auth-box hidden">
+    <h2 id="authTitle">Login</h2>
+
+    <input type="text" id="username" placeholder="Username" class="hidden"/>
+    <input type="email" id="email" placeholder="Email"/>
+    <input type="password" id="password" placeholder="Password"/>
+
+    <button id="authSubmitBtn">Submit</button>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search movies..."/>
+    <button onclick="searchMovies()">Search</button>
+  </div>
+
+  <!-- MOVIES -->
+  <div id="movies" class="movie-grid"></div>
+
+</div>
+
+<!-- MODAL -->
+<div id="movieModal" class="modal hidden">
+  <div class="modal-content" id="modalContent">
+
+    <button onclick="closeModal()">Close</button>
+
+    <div id="movieDetails"></div>
+
+    <h2>Reviews</h2>
+    <div id="reviews"></div>
+
+    <div id="reviewForm" class="hidden">
+      <h3>Leave Review</h3>
+
+      <select id="rating"></select>
+
+      <textarea id="comment" placeholder="Write review..."></textarea>
+
+      <button onclick="submitReview()">Submit</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+
+const API_BASE = "http://localhost:3000";
+
+const fakeMovies = [
+  { id: 550, title: "Fight Club", poster: "https://via.placeholder.com/300x450?text=Fight+Club" },
+  { id: 680, title: "Pulp Fiction", poster: "https://via.placeholder.com/300x450?text=Pulp+Fiction" },
+  { id: 13, title: "Forrest Gump", poster: "https://via.placeholder.com/300x450?text=Forrest+Gump" }
+];
+
+let currentMovieId = null;
+let authMode = "login";
+
+/* ratings */
+for (let i = 1; i <= 10; i++) {
+  document.getElementById("rating").innerHTML += `<option value="${i}">${i}</option>`;
+}
+
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function closeModal() {
+  document.getElementById("movieModal").classList.add("hidden");
+  currentMovieId = null;
+}
+
+/* click outside modal closes */
+document.getElementById("movieModal").addEventListener("click", (e) => {
+  if (e.target.id === "movieModal") {
+    closeModal();
+  }
+});
+
+/* search */
+function searchMovies() {
+  const q = document.getElementById("searchInput").value.toLowerCase();
+  const container = document.getElementById("movies");
+  container.innerHTML = "";
+
+  fakeMovies
+    .filter(m => m.title.toLowerCase().includes(q))
+    .forEach(movie => {
+      container.innerHTML += `
+        <div class="movie-card">
+          <img src="${movie.poster}">
+          <h3>${movie.title}</h3>
+          <button onclick="openMovie(${movie.id}, '${movie.title}')">
+            View Reviews
+          </button>
+        </div>
+      `;
+    });
+}
+
+/* open movie */
+async function openMovie(id, title) {
+  currentMovieId = id;
+
+  document.getElementById("movieModal").classList.remove("hidden");
+
+  document.getElementById("movieDetails").innerHTML = `<h2>${title}</h2>`;
+
+  await loadReviews(id);
+}
+
+/* load reviews */
+async function loadReviews(movieId) {
+  try {
+    const res = await fetch(`${API_BASE}/reviews/${movieId}`);
+    const data = await res.json();
+
+    const div = document.getElementById("reviews");
+    div.innerHTML = "";
+
+    if (!data.length) {
+      div.innerHTML = "<p>No reviews yet.</p>";
+      return;
+    }
+
+    data.forEach(r => {
+      div.innerHTML += `
+        <div class="review">
+          <b>${r.rating}/10</b>
+          <p>${r.body || ""}</p>
+        </div>
+      `;
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/* submit review */
+async function submitReview() {
+  const token = getToken();
+  if (!token) return alert("Login first");
+
+  const rating = document.getElementById("rating").value;
+  const comment = document.getElementById("comment").value;
+
+  const res = await fetch(`${API_BASE}/reviews`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      movieId: currentMovieId,
+      rating: Number(rating),
+      comment
+    })
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    alert("Review added");
+    loadReviews(currentMovieId);
+  } else {
+    alert(JSON.stringify(data));
+  }
+}
+
+searchMovies();
+
+</script>
+
+</body>
 </html>
