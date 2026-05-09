@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
+const { requestLogger } = require('./middleware/requestLogger');
 const authRoutes   = require('./routes/auth');
 const movieRoutes  = require('./routes/movies');
 const reviewRoutes = require('./routes/reviews');
@@ -23,6 +24,7 @@ app.use(cors());
 
 // Parse JSON
 app.use(express.json());
+app.use(requestLogger);
 
 // ==============================
 // RATE LIMITING (GLOBAL)
