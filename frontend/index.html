@@ -313,6 +313,7 @@
   <h1 id="brandTitle" style="cursor:pointer;">Movie Review Hub</h1>
   <div>
     <span id="userGreeting" class="user-greeting hidden"></span>
+    <button id="homeBtn">Home</button>
     <button id="profileBtn" class="hidden">My Reviews</button>
     <button id="loginBtn">Login</button>
     <button id="registerBtn">Register</button>
@@ -346,8 +347,14 @@
       <button id="searchBtn">Search</button>
     </div>
 
+    <h2 id="gridHeading" style="margin: 0 0 1rem 0;">Trending This Week</h2>
+
     <!-- MOVIES -->
     <div id="movies" class="movie-grid"></div>
+
+    <div style="text-align:center; margin-top:1.5rem;">
+      <button id="loadMoreBtn" class="hidden">Load More</button>
+    </div>
   </div>
 
   <!-- PROFILE VIEW -->
@@ -398,6 +405,12 @@ let currentMovie = null;     // full movie object from /movies/:id
 let myReviewForCurrent = null; // user's existing review for the current movie (or null)
 let editingReview = false;
 let authMode = "login";
+
+// Home grid pagination state
+let feedMode    = "trending"; // "trending" | "search"
+let feedQuery   = "";
+let feedPage    = 1;
+let feedTotalPages = 1;
 
 // ============================================================
 // SAFE RENDERING HELPERS
@@ -478,9 +491,13 @@ function applyAuthState() {
 // ============================================================
 // VIEW SWITCHING
 // ============================================================
-function showHomeView() {
+function showHomeView({ resetFeed = false } = {}) {
   document.getElementById("homeView").classList.remove("hidden");
   document.getElementById("profileView").classList.add("hidden");
+  if (resetFeed) {
+    document.getElementById("searchInput").value = "";
+    loadPopular();
+  }
 }
 
 function showProfileView() {
@@ -598,11 +615,11 @@ function posterUrl(movie) {
   return movie.poster_path ? `${TMDB_IMG_BASE}${movie.poster_path}` : POSTER_PLACEHOLDER;
 }
 
-function renderMovies(movies) {
+function renderMovies(movies, append = false) {
   const container = document.getElementById("movies");
-  clear(container);
+  if (!append) clear(container);
 
-  if (!movies.length) {
+  if (!movies.length && !append) {
     container.appendChild(el("p", { text: "No movies found." }));
     return;
   }
@@ -617,23 +634,53 @@ function renderMovies(movies) {
     card.appendChild(el("h3", { text: movie.title || "Untitled" }));
 
     const btn = el("button", { text: "View Reviews" });
-    btn.addEventListener("click", () => openMovie(movie.id, movie.title));
+    btn.addEventListener("click", () => openMovie(movie.id));
     card.appendChild(btn);
 
     container.appendChild(card);
   });
 }
 
-async function loadPopular() {
+function setHeading(text) {
+  document.getElementById("gridHeading").textContent = text;
+}
+
+function updateLoadMoreBtn() {
+  const btn = document.getElementById("loadMoreBtn");
+  if (feedPage < feedTotalPages) btn.classList.remove("hidden");
+  else btn.classList.add("hidden");
+}
+
+async function fetchFeedPage(page) {
+  if (feedMode === "search") {
+    return fetch(`${API_BASE}/movies/search?query=${encodeURIComponent(feedQuery)}&page=${page}`);
+  }
+  return fetch(`${API_BASE}/movies/popular?page=${page}`);
+}
+
+async function loadFeed(append = false) {
   try {
-    const res = await fetch(`${API_BASE}/movies/popular`);
+    const res = await fetchFeedPage(feedPage);
     const data = await res.json();
-    renderMovies(Array.isArray(data.results) ? data.results : []);
+    feedTotalPages = data.total_pages || 1;
+    renderMovies(Array.isArray(data.results) ? data.results : [], append);
+    updateLoadMoreBtn();
   } catch (err) {
     const container = document.getElementById("movies");
-    clear(container);
-    container.appendChild(el("p", { text: "Could not load movies. Is the gateway running?" }));
+    if (!append) {
+      clear(container);
+      container.appendChild(el("p", { text: "Could not load movies. Is the gateway running?" }));
+    }
+    document.getElementById("loadMoreBtn").classList.add("hidden");
   }
+}
+
+async function loadPopular() {
+  feedMode = "trending";
+  feedQuery = "";
+  feedPage = 1;
+  setHeading("Trending This Week");
+  await loadFeed(false);
 }
 
 async function searchMovies() {
@@ -644,15 +691,17 @@ async function searchMovies() {
     return;
   }
 
-  try {
-    const res = await fetch(`${API_BASE}/movies/search?query=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    renderMovies(Array.isArray(data.results) ? data.results : []);
-  } catch (err) {
-    const container = document.getElementById("movies");
-    clear(container);
-    container.appendChild(el("p", { text: "Search failed. Try again." }));
-  }
+  feedMode = "search";
+  feedQuery = query;
+  feedPage = 1;
+  setHeading(`Results for "${query}"`);
+  await loadFeed(false);
+}
+
+async function loadMoreMovies() {
+  if (feedPage >= feedTotalPages) return;
+  feedPage += 1;
+  await loadFeed(true);
 }
 // ============================================================
 // MOVIE DETAILS MODAL
@@ -1125,6 +1174,14 @@ document.getElementById("authSubmitBtn").addEventListener("click", () => {
 
 document.getElementById("searchBtn").addEventListener("click", () => searchMovies());
 
+document.getElementById("searchInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") searchMovies();
+});
+
+document.getElementById("loadMoreBtn").addEventListener("click", () => loadMoreMovies());
+
+document.getElementById("homeBtn").addEventListener("click", () => showHomeView({ resetFeed: true }));
+
 document.getElementById("closeModalBtn").addEventListener("click", () => closeModal());
 
 document.getElementById("submitReviewBtn").addEventListener("click", () => submitReview());
@@ -1133,7 +1190,7 @@ document.getElementById("cancelEditBtn").addEventListener("click", () => cancelE
 
 document.getElementById("profileBtn").addEventListener("click", () => showProfileView());
 
-document.getElementById("brandTitle").addEventListener("click", () => showHomeView());
+document.getElementById("brandTitle").addEventListener("click", () => showHomeView({ resetFeed: true }));
 
 document.getElementById("movieModal").addEventListener("click", (e) => {
   if (e.target.id === "movieModal") closeModal();

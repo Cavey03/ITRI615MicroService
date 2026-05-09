@@ -21,11 +21,14 @@ async function tmdb(path, query = {}) {
 
 // ======================================
 // SEARCH MOVIES
-// GET /movies/search?query=batman
+// GET /movies/search?query=batman&page=1
+// Filters: no adult content, vote_count >= 50 (drops obscure entries),
+// sorted by vote_count descending so well-known films float up.
 // ======================================
 router.get('/search', async (req, res) => {
   try {
     const query = req.query.query;
+    const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
 
     if (!query) {
       return res.status(400).json({
@@ -33,7 +36,18 @@ router.get('/search', async (req, res) => {
       });
     }
 
-    const data = await tmdb('/search/movie', { query });
+    const data = await tmdb('/search/movie', {
+      query,
+      page,
+      include_adult: false,
+    });
+
+    if (Array.isArray(data.results)) {
+      data.results = data.results
+        .filter(m => !m.adult && (m.vote_count || 0) >= 50)
+        .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+    }
+
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -44,17 +58,28 @@ router.get('/search', async (req, res) => {
 });
 
 // ======================================
-// GET POPULAR MOVIES
-// GET /movies/popular
+// GET TRENDING MOVIES (homepage feed)
+// GET /movies/popular?page=1
+// Uses TMDB's "trending this week" — more relevant than /movie/popular.
 // ======================================
 router.get('/popular', async (req, res) => {
   try {
-    const data = await tmdb('/movie/popular');
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+
+    const data = await tmdb('/trending/movie/week', {
+      page,
+      include_adult: false,
+    });
+
+    if (Array.isArray(data.results)) {
+      data.results = data.results.filter(m => !m.adult);
+    }
+
     res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      message: 'Error fetching popular movies'
+      message: 'Error fetching trending movies'
     });
   }
 });
