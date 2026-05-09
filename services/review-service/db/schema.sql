@@ -11,14 +11,17 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
--- Reviews (movie identity comes from TMDB, we only store the TMDB movie ID)
+-- Reviews (snapshot of movie title/poster at write time so the profile page
+-- never depends on TMDB being reachable to render a user's history)
 CREATE TABLE IF NOT EXISTS reviews (
-  id              SERIAL PRIMARY KEY,
-  user_id         INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tmdb_movie_id   INTEGER  NOT NULL,
-  rating          SMALLINT NOT NULL CHECK (rating >= 1 AND rating <= 10),
-  body            TEXT,
-  created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+  id                 SERIAL PRIMARY KEY,
+  user_id            INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tmdb_movie_id      INTEGER      NOT NULL,
+  movie_title        VARCHAR(255) NOT NULL,
+  movie_poster_path  VARCHAR(255),
+  rating             SMALLINT     NOT NULL CHECK (rating >= 1 AND rating <= 10),
+  body               TEXT,
+  created_at         TIMESTAMP    NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, tmdb_movie_id)
 );
 

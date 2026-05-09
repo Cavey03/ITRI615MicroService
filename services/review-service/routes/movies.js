@@ -77,4 +77,20 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ======================================
+// GET TMDB COMMUNITY REVIEWS for a movie
+// GET /movies/:id/reviews
+// ======================================
+router.get('/:id/reviews', async (req, res) => {
+  try {
+    const data = await tmdb(`/movie/${req.params.id}/reviews`);
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: 'Error fetching community reviews'
+    });
+  }
+});
+
 module.exports = router;
