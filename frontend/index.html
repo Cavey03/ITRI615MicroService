@@ -363,8 +363,72 @@ function logout() {
   applyAuthState();
 }
 
-async function loadPopular() { /* commit 3 */ }
-async function searchMovies() { /* commit 3 */ }
+// ============================================================
+// MOVIES — real TMDB data via the gateway
+// ============================================================
+const TMDB_IMG_BASE  = "https://image.tmdb.org/t/p/w500";
+const POSTER_PLACEHOLDER = "https://placehold.co/300x450?text=No+Image";
+
+function posterUrl(movie) {
+  return movie.poster_path ? `${TMDB_IMG_BASE}${movie.poster_path}` : POSTER_PLACEHOLDER;
+}
+
+function renderMovies(movies) {
+  const container = document.getElementById("movies");
+  clear(container);
+
+  if (!movies.length) {
+    container.appendChild(el("p", { text: "No movies found." }));
+    return;
+  }
+
+  movies.forEach(movie => {
+    const card = el("div", { className: "movie-card" });
+
+    const img = el("img", { attrs: { src: posterUrl(movie), alt: movie.title || "" } });
+    card.appendChild(img);
+
+    // textContent prevents HTML/script injection from movie titles.
+    card.appendChild(el("h3", { text: movie.title || "Untitled" }));
+
+    const btn = el("button", { text: "View Reviews" });
+    btn.addEventListener("click", () => openMovie(movie.id, movie.title));
+    card.appendChild(btn);
+
+    container.appendChild(card);
+  });
+}
+
+async function loadPopular() {
+  try {
+    const res = await fetch(`${API_BASE}/movies/popular`);
+    const data = await res.json();
+    renderMovies(Array.isArray(data.results) ? data.results : []);
+  } catch (err) {
+    const container = document.getElementById("movies");
+    clear(container);
+    container.appendChild(el("p", { text: "Could not load movies. Is the gateway running?" }));
+  }
+}
+
+async function searchMovies() {
+  const query = document.getElementById("searchInput").value.trim();
+
+  if (!query) {
+    loadPopular();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/movies/search?query=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    renderMovies(Array.isArray(data.results) ? data.results : []);
+  } catch (err) {
+    const container = document.getElementById("movies");
+    clear(container);
+    container.appendChild(el("p", { text: "Search failed. Try again." }));
+  }
+}
 async function openMovie(id, title) { /* commit 4 */ }
 async function loadReviews(movieId) { /* commit 4 */ }
 async function submitReview() { /* commit 4 */ }

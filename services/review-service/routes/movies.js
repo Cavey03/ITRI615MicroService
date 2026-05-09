@@ -4,6 +4,21 @@ const fetch = require('node-fetch');
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
+// TMDB v4 Read Access Token authentication.
+// Sending the token as an Authorization header (instead of a query param)
+// keeps it out of URLs, browser history, and access logs.
+const tmdbHeaders = {
+  Authorization: `Bearer ${TMDB_API_KEY}`,
+  Accept: 'application/json',
+};
+
+async function tmdb(path, query = {}) {
+  const url = new URL(`${TMDB_BASE_URL}${path}`);
+  for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
+  const response = await fetch(url, { headers: tmdbHeaders });
+  return response.json();
+}
+
 // ======================================
 // SEARCH MOVIES
 // GET /movies/search?query=batman
@@ -18,12 +33,7 @@ router.get('/search', async (req, res) => {
       });
     }
 
-    const response = await fetch(
-      `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`
-    );
-
-    const data = await response.json();
-
+    const data = await tmdb('/search/movie', { query });
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -39,12 +49,7 @@ router.get('/search', async (req, res) => {
 // ======================================
 router.get('/popular', async (req, res) => {
   try {
-    const response = await fetch(
-      `${TMDB_BASE_URL}/movie/popular?api_key=${TMDB_API_KEY}`
-    );
-
-    const data = await response.json();
-
+    const data = await tmdb('/movie/popular');
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -60,14 +65,7 @@ router.get('/popular', async (req, res) => {
 // ======================================
 router.get('/:id', async (req, res) => {
   try {
-    const movieId = req.params.id;
-
-    const response = await fetch(
-      `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}`
-    );
-
-    const data = await response.json();
-
+    const data = await tmdb(`/movie/${req.params.id}`);
     res.json(data);
   } catch (err) {
     console.error(err);
