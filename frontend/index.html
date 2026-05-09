@@ -102,16 +102,136 @@
     .modal-content {
       background-color: #1d1d1d;
       padding: 2rem;
-      border-radius: 10px;
+      border-radius: 18px;
       width: 100%;
-      max-width: 700px;
-      max-height: 90vh;
+      max-width: 820px;
+      max-height: 88vh;
       overflow-y: auto;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background-color: #2a2a2a;
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+    }
+
+    .movie-header {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .movie-header img {
+      width: 180px;
+      height: 270px;
+      object-fit: cover;
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+
+    .movie-meta {
+      flex: 1;
+    }
+
+    .movie-meta h2 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+
+    .movie-meta .meta-row {
+      color: #bbb;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    .movie-meta .rating {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    .genre-pill {
+      display: inline-block;
+      background-color: #2a2a2a;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      margin-right: 0.4rem;
+      font-size: 0.85rem;
+    }
+
+    .synopsis {
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .trailer-wrap {
+      position: relative;
+      padding-top: 56.25%;
+      margin-bottom: 1.5rem;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .trailer-wrap iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .cast-strip {
+      display: flex;
+      gap: 0.8rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .cast-card {
+      flex-shrink: 0;
+      width: 100px;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    .cast-card img {
+      width: 100px;
+      height: 130px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 0.4rem;
+    }
+
+    .cast-card .actor-name {
+      font-weight: bold;
+    }
+
+    .cast-card .character-name {
+      color: #aaa;
+      font-size: 0.8rem;
+    }
+
+    .section-title {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #333;
+      padding-bottom: 0.3rem;
     }
 
     .review {
       border-top: 1px solid #333;
       padding: 1rem 0;
+    }
+
+    .review-meta {
+      color: #aaa;
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
     }
 
     .error-msg {
@@ -170,15 +290,15 @@
 <div id="movieModal" class="modal hidden">
   <div class="modal-content" id="modalContent">
 
-    <button id="closeModalBtn">Close</button>
+    <button id="closeModalBtn" class="modal-close">Close</button>
 
     <div id="movieDetails"></div>
 
-    <h2>Reviews</h2>
+    <h3 class="section-title">Reviews</h3>
     <div id="reviews"></div>
 
     <div id="reviewForm" class="hidden">
-      <h3>Leave Review</h3>
+      <h3 class="section-title">Leave a Review</h3>
 
       <select id="rating"></select>
 
@@ -186,6 +306,10 @@
 
       <button id="submitReviewBtn">Submit</button>
       <div id="reviewError" class="error-msg"></div>
+    </div>
+
+    <div id="loginPrompt" class="hidden" style="margin-top:1rem; color:#aaa;">
+      Login to leave a review.
     </div>
 
   </div>
@@ -262,6 +386,8 @@ function applyAuthState() {
     greeting.textContent = "";
     greeting.classList.add("hidden");
   }
+
+  applyReviewFormVisibility();
 }
 
 function setAuthError(msg) {
@@ -429,9 +555,214 @@ async function searchMovies() {
     container.appendChild(el("p", { text: "Search failed. Try again." }));
   }
 }
-async function openMovie(id, title) { /* commit 4 */ }
-async function loadReviews(movieId) { /* commit 4 */ }
-async function submitReview() { /* commit 4 */ }
+// ============================================================
+// MOVIE DETAILS MODAL
+// ============================================================
+const TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w185";
+
+function pickTrailer(videos) {
+  if (!videos || !Array.isArray(videos.results)) return null;
+  return videos.results.find(v =>
+    v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser")
+  );
+}
+
+function renderMovieDetails(movie) {
+  const root = document.getElementById("movieDetails");
+  clear(root);
+
+  // Header: poster + meta
+  const header = el("div", { className: "movie-header" });
+
+  const poster = el("img", {
+    attrs: {
+      src: movie.poster_path ? `${TMDB_IMG_BASE}${movie.poster_path}` : POSTER_PLACEHOLDER,
+      alt: movie.title || "",
+    },
+  });
+  header.appendChild(poster);
+
+  const meta = el("div", { className: "movie-meta" });
+  meta.appendChild(el("h2", { text: movie.title || "Untitled" }));
+
+  const year = movie.release_date ? movie.release_date.slice(0, 4) : "";
+  const runtime = movie.runtime ? `${movie.runtime} min` : "";
+  const ratingText = movie.vote_average
+    ? `⭐ ${Number(movie.vote_average).toFixed(1)}/10`
+    : "No rating";
+
+  const metaParts = [year, runtime].filter(Boolean).join(" • ");
+  if (metaParts) meta.appendChild(el("div", { className: "meta-row", text: metaParts }));
+
+  meta.appendChild(el("div", { className: "meta-row rating", text: ratingText }));
+
+  if (Array.isArray(movie.genres) && movie.genres.length) {
+    const genreRow = el("div", { className: "meta-row" });
+    movie.genres.forEach(g => {
+      genreRow.appendChild(el("span", { className: "genre-pill", text: g.name }));
+    });
+    meta.appendChild(genreRow);
+  }
+
+  header.appendChild(meta);
+  root.appendChild(header);
+
+  // Synopsis
+  if (movie.overview) {
+    root.appendChild(el("p", { className: "synopsis", text: movie.overview }));
+  }
+
+  // Trailer
+  const trailer = pickTrailer(movie.videos);
+  if (trailer && /^[A-Za-z0-9_-]{6,15}$/.test(trailer.key)) {
+    const wrap = el("div", { className: "trailer-wrap" });
+    const iframe = el("iframe", {
+      attrs: {
+        src: `https://www.youtube-nocookie.com/embed/${trailer.key}`,
+        title: "Trailer",
+        allow: "accelerometer; encrypted-media; picture-in-picture",
+        referrerpolicy: "strict-origin-when-cross-origin",
+        allowfullscreen: "",
+      },
+    });
+    wrap.appendChild(iframe);
+    root.appendChild(wrap);
+  }
+
+  // Cast
+  if (movie.credits && Array.isArray(movie.credits.cast) && movie.credits.cast.length) {
+    root.appendChild(el("h3", { className: "section-title", text: "Top Cast" }));
+    const strip = el("div", { className: "cast-strip" });
+
+    movie.credits.cast.slice(0, 8).forEach(actor => {
+      const card = el("div", { className: "cast-card" });
+      const photo = el("img", {
+        attrs: {
+          src: actor.profile_path
+            ? `${TMDB_PROFILE_BASE}${actor.profile_path}`
+            : "https://placehold.co/100x130?text=%3F",
+          alt: actor.name || "",
+        },
+      });
+      card.appendChild(photo);
+      card.appendChild(el("div", { className: "actor-name", text: actor.name || "" }));
+      if (actor.character) {
+        card.appendChild(el("div", { className: "character-name", text: actor.character }));
+      }
+      strip.appendChild(card);
+    });
+
+    root.appendChild(strip);
+  }
+}
+
+async function openMovie(id) {
+  currentMovieId = id;
+  const modal = document.getElementById("movieModal");
+  const details = document.getElementById("movieDetails");
+  const reviewsDiv = document.getElementById("reviews");
+
+  // Loading placeholder
+  clear(details);
+  details.appendChild(el("p", { text: "Loading movie..." }));
+  clear(reviewsDiv);
+
+  modal.classList.remove("hidden");
+  applyReviewFormVisibility();
+
+  try {
+    const res = await fetch(`${API_BASE}/movies/${encodeURIComponent(id)}`);
+    const data = await res.json();
+    renderMovieDetails(data);
+  } catch (err) {
+    clear(details);
+    details.appendChild(el("p", { text: "Could not load movie details." }));
+  }
+
+  loadReviews(id);
+}
+
+async function loadReviews(movieId) {
+  const div = document.getElementById("reviews");
+  clear(div);
+
+  try {
+    const res = await fetch(`${API_BASE}/reviews/${encodeURIComponent(movieId)}`);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || !data.length) {
+      div.appendChild(el("p", { text: "No reviews yet — be the first!" }));
+      return;
+    }
+
+    data.forEach(r => {
+      const item = el("div", { className: "review" });
+      item.appendChild(el("div", { className: "review-meta", text: `Rating: ${r.rating}/10` }));
+      // textContent on the review body neutralises any HTML/script content the reviewer typed.
+      item.appendChild(el("p", { text: r.body || "" }));
+      div.appendChild(item);
+    });
+  } catch (err) {
+    div.appendChild(el("p", { text: "Could not load reviews." }));
+  }
+}
+
+function applyReviewFormVisibility() {
+  const loggedIn = !!getToken();
+  document.getElementById("reviewForm").classList.toggle("hidden", !loggedIn);
+  document.getElementById("loginPrompt").classList.toggle("hidden", loggedIn);
+}
+
+function setReviewError(msg) {
+  document.getElementById("reviewError").textContent = msg || "";
+}
+
+async function submitReview() {
+  setReviewError("");
+  const token = getToken();
+  if (!token) {
+    setReviewError("You must be logged in to submit a review.");
+    return;
+  }
+
+  const rating  = Number(document.getElementById("rating").value);
+  const comment = document.getElementById("comment").value.trim();
+
+  if (!currentMovieId) {
+    setReviewError("No movie selected.");
+    return;
+  }
+
+  if (comment && (comment.length < 3 || comment.length > 500)) {
+    setReviewError("Comment must be 3-500 characters.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/reviews`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ movieId: currentMovieId, rating, comment }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const msg = typeof data.error === "string"
+        ? data.error
+        : (Array.isArray(data.error) ? data.error[0]?.msg : "Could not submit review");
+      setReviewError(msg);
+      return;
+    }
+
+    document.getElementById("comment").value = "";
+    loadReviews(currentMovieId);
+  } catch (err) {
+    setReviewError("Network error. Try again.");
+  }
+}
 
 // ============================================================
 // RATING OPTIONS (1-10)

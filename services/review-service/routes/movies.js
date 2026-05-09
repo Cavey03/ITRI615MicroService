@@ -60,12 +60,14 @@ router.get('/popular', async (req, res) => {
 });
 
 // ======================================
-// GET MOVIE DETAILS
+// GET MOVIE DETAILS (with trailers and cast in one call)
 // GET /movies/:id
 // ======================================
 router.get('/:id', async (req, res) => {
   try {
-    const data = await tmdb(`/movie/${req.params.id}`);
+    const data = await tmdb(`/movie/${req.params.id}`, {
+      append_to_response: 'videos,credits',
+    });
     res.json(data);
   } catch (err) {
     console.error(err);
