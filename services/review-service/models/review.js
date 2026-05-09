@@ -1,4 +1,3 @@
-// Step 8: Review model — placeholder
 const db = require("../db/connection");
 
 // ==============================

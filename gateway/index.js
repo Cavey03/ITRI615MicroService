@@ -2,11 +2,19 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const helmet = require('helmet');
+const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-app.use(helmet());
+// Helmet with cross-origin friendly settings (so the browser frontend can call us)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false,
+}));
+
+// Allow the frontend to call us from any origin
+app.use(cors());
 
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,

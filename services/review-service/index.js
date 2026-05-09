@@ -1,5 +1,12 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
+const requiredEnv = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'TMDB_API_KEY'];
+const missing = requiredEnv.filter(v => !process.env[v]);
+if (missing.length) {
+  console.error(`Missing required environment variables: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -32,7 +39,7 @@ app.use(requestLogger);
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // max requests per IP
-  message: "Too many requests, please try again later",
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 app.use(limiter);
@@ -58,7 +65,7 @@ app.use((err, req, res, next) => {
   console.error(err);
 
   res.status(err.status || 500).json({
-    message: err.message || "Internal server error"
+    error: err.message || 'Internal server error',
   });
 });
 
