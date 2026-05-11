@@ -399,7 +399,12 @@
 
 <script>
 
-const API_BASE = "http://localhost:8080";
+// API base — auto-detects local development vs deployed.
+// AFTER DEPLOYING THE GATEWAY: replace the placeholder below with your
+// real Render gateway URL (e.g. "https://my-gateway.onrender.com").
+const PROD_API_BASE = "https://CHANGE-ME-GATEWAY.onrender.com";
+const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const API_BASE = isLocal ? "http://localhost:8080" : PROD_API_BASE;
 
 let currentMovie = null;     // full movie object from /movies/:id
 let myReviewForCurrent = null; // user's existing review for the current movie (or null)

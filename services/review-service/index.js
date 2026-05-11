@@ -1,6 +1,13 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-const requiredEnv = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'TMDB_API_KEY'];
+// Always required
+const requiredEnv = ['JWT_SECRET', 'TMDB_API_KEY'];
+
+// Either DATABASE_URL (prod) or the discrete DB_* variables (local) must be set.
+if (!process.env.DATABASE_URL) {
+  requiredEnv.push('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD');
+}
+
 const missing = requiredEnv.filter(v => !process.env[v]);
 if (missing.length) {
   console.error(`Missing required environment variables: ${missing.join(', ')}`);
@@ -18,6 +25,33 @@ const movieRoutes  = require('./routes/movies');
 const reviewRoutes = require('./routes/reviews');
 
 const app = express();
+
+// Trust the first proxy in front of us (the API gateway / Render's edge).
+// Without this, express-rate-limit sees the proxy IP for every request and
+// applies a single global limit across all clients — effectively broken.
+app.set('trust proxy', 1);
+
+// ==============================
+// SERVICE-TO-SERVICE AUTH
+// ==============================
+// On shared hosting (Render free tier) the review service has a public URL
+// even though it's only meant to be called by the gateway. The gateway
+// attaches an X-Internal-Secret header on every proxied request; we reject
+// anything missing or mismatched. This means the public URL is useless to
+// outsiders even though it's technically reachable.
+//
+// In local dev INTERNAL_SECRET is typically unset — we skip the check so
+// developers can curl the service directly.
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+
+if (INTERNAL_SECRET) {
+  app.use((req, res, next) => {
+    // Allow healthcheck without secret — Render needs to probe this
+    if (req.path === '/health') return next();
+    if (req.headers['x-internal-secret'] === INTERNAL_SECRET) return next();
+    return res.status(403).json({ error: 'Forbidden' });
+  });
+}
 
 // ==============================
 // SECURITY MIDDLEWARE
