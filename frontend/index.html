@@ -6,19 +6,39 @@
   <title>Movie Review Hub</title>
 
   <style>
-    * {
-      box-sizing: border-box;
+    /* ==================== THEME TOKENS ==================== */
+    /* Default ("Classic") — current dark Netflix-y theme */
+    :root {
+      --bg:            #121212;
+      --header-bg:     #1f1f1f;
+      --surface:       #1d1d1d;
+      --surface-2:     #2a2a2a;
+      --surface-hover: #232323;
+      --input-bg:      #1e1e1e;
+      --text:          #ffffff;
+      --text-dim:      #bbbbbb;
+      --text-muted:    #aaaaaa;
+      --accent:        #e50914;
+      --accent-text:   #ffffff;
+      --neutral-btn:   #444444;
+      --danger:        #8b1f1f;
+      --rating:        #ffd700;
+      --border:        #333333;
+      --error:         #ff6b6b;
+      --modal-overlay: rgba(0,0,0,0.8);
     }
+
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: white;
+      background-color: var(--bg);
+      color: var(--text);
     }
 
     header {
-      background-color: #1f1f1f;
+      background-color: var(--header-bg);
       padding: 1rem 2rem;
       display: flex;
       justify-content: space-between;
@@ -31,8 +51,8 @@
       padding: 0.6rem 1rem;
       border: none;
       border-radius: 6px;
-      background-color: #e50914;
-      color: white;
+      background-color: var(--accent);
+      color: var(--accent-text);
       cursor: pointer;
     }
 
@@ -44,9 +64,9 @@
       margin-top: 0.5rem;
       margin-bottom: 1rem;
       border-radius: 6px;
-      border: 1px solid #333;
-      background-color: #1e1e1e;
-      color: white;
+      border: 1px solid var(--border);
+      background-color: var(--input-bg);
+      color: var(--text);
     }
 
     .container { padding: 2rem; }
@@ -64,7 +84,7 @@
     }
 
     .movie-card {
-      background-color: #1d1d1d;
+      background-color: var(--surface);
       border-radius: 10px;
       padding: 1rem;
       text-align: center;
@@ -77,14 +97,12 @@
       border-radius: 8px;
     }
 
-    .hidden {
-      display: none !important;
-    }
+    .hidden { display: none !important; }
 
     .auth-box {
       max-width: 400px;
       margin-bottom: 2rem;
-      background-color: #1d1d1d;
+      background-color: var(--surface);
       padding: 1.5rem;
       border-radius: 10px;
     }
@@ -92,7 +110,7 @@
     .modal {
       position: fixed;
       inset: 0;
-      background-color: rgba(0,0,0,0.8);
+      background-color: var(--modal-overlay);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -100,7 +118,7 @@
     }
 
     .modal-content {
-      background-color: #1d1d1d;
+      background-color: var(--surface);
       padding: 2rem;
       border-radius: 18px;
       width: 100%;
@@ -114,7 +132,8 @@
       position: absolute;
       top: 1rem;
       right: 1rem;
-      background-color: #2a2a2a;
+      background-color: var(--surface-2);
+      color: var(--text);
       padding: 0.4rem 0.8rem;
       border-radius: 8px;
     }
@@ -133,9 +152,7 @@
       flex-shrink: 0;
     }
 
-    .movie-meta {
-      flex: 1;
-    }
+    .movie-meta { flex: 1; }
 
     .movie-meta h2 {
       margin-top: 0;
@@ -143,19 +160,19 @@
     }
 
     .movie-meta .meta-row {
-      color: #bbb;
+      color: var(--text-dim);
       margin-bottom: 0.5rem;
       font-size: 0.95rem;
     }
 
     .movie-meta .rating {
-      color: #ffd700;
+      color: var(--rating);
       font-weight: bold;
     }
 
     .genre-pill {
       display: inline-block;
-      background-color: #2a2a2a;
+      background-color: var(--surface-2);
       padding: 0.2rem 0.6rem;
       border-radius: 999px;
       margin-right: 0.4rem;
@@ -207,58 +224,56 @@
       margin-bottom: 0.4rem;
     }
 
-    .cast-card .actor-name {
-      font-weight: bold;
-    }
+    .cast-card .actor-name { font-weight: bold; }
 
     .cast-card .character-name {
-      color: #aaa;
+      color: var(--text-muted);
       font-size: 0.8rem;
     }
 
     .section-title {
       margin-top: 1.5rem;
       margin-bottom: 0.5rem;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid var(--border);
       padding-bottom: 0.3rem;
     }
 
     .review {
-      border-top: 1px solid #333;
+      border-top: 1px solid var(--border);
       padding: 1rem 0;
     }
 
     .review-meta {
-      color: #aaa;
+      color: var(--text-muted);
       font-size: 0.85rem;
       margin-bottom: 0.3rem;
     }
 
     .my-review-existing {
-      background-color: #2a2a2a;
+      background-color: var(--surface-2);
       padding: 1rem;
       border-radius: 12px;
       margin-bottom: 1rem;
     }
 
-    .my-review-actions {
-      margin-top: 0.6rem;
-    }
+    .my-review-actions { margin-top: 0.6rem; }
 
     .my-review-actions button {
       margin-right: 0.5rem;
-      background-color: #444;
+      background-color: var(--neutral-btn);
+      color: var(--text);
     }
 
     .my-review-actions button.danger {
-      background-color: #8b1f1f;
+      background-color: var(--danger);
+      color: #ffffff;
     }
 
     /* Profile page */
     .profile-card {
       display: flex;
       gap: 1rem;
-      background-color: #1d1d1d;
+      background-color: var(--surface);
       padding: 1rem;
       border-radius: 12px;
       margin-bottom: 1rem;
@@ -266,7 +281,7 @@
     }
 
     .profile-card:hover {
-      background-color: #232323;
+      background-color: var(--surface-hover);
     }
 
     .profile-card img {
@@ -277,33 +292,29 @@
       flex-shrink: 0;
     }
 
-    .profile-card .profile-info {
-      flex: 1;
-    }
+    .profile-card .profile-info { flex: 1; }
 
     .profile-card h3 {
       margin: 0 0 0.3rem 0;
     }
 
     .profile-card .profile-meta {
-      color: #aaa;
+      color: var(--text-muted);
       font-size: 0.85rem;
       margin-bottom: 0.5rem;
     }
 
     .profile-card .profile-rating {
-      color: #ffd700;
+      color: var(--rating);
       font-weight: bold;
     }
 
     .error-msg {
-      color: #ff6b6b;
+      color: var(--error);
       margin-top: 0.5rem;
     }
 
-    .user-greeting {
-      margin-right: 1rem;
-    }
+    .user-greeting { margin-right: 1rem; }
   </style>
 </head>
 
@@ -331,7 +342,7 @@
     <input type="email" id="email" placeholder="Email"/>
     <input type="password" id="password" placeholder="Password"/>
 
-    <small id="passwordHint" class="hidden" style="display:block; color:#aaa; margin-top:-0.5rem; margin-bottom:1rem;">
+    <small id="passwordHint" class="hidden" style="display:block; color:var(--text-muted); margin-top:-0.5rem; margin-bottom:1rem;">
       Min 8 characters with uppercase, lowercase, a number, and a special character.
     </small>
 
@@ -389,11 +400,11 @@
         <textarea id="comment" placeholder="Write your review of this movie..."></textarea>
 
         <button id="submitReviewBtn">Save</button>
-        <button id="cancelEditBtn" class="hidden" style="margin-left:0.5rem; background-color:#444;">Cancel</button>
+        <button id="cancelEditBtn" class="hidden" style="margin-left:0.5rem; background-color:var(--neutral-btn); color:var(--text);">Cancel</button>
         <div id="reviewError" class="error-msg"></div>
       </div>
 
-      <div id="loginPrompt" class="hidden" style="margin-top:1rem; color:#aaa;">
+      <div id="loginPrompt" class="hidden" style="margin-top:1rem; color:var(--text-muted);">
         Login to leave a review.
       </div>
     </div>
@@ -821,7 +832,8 @@ async function openMovie(id) {
   clear(details);
   details.appendChild(el("p", { text: "Loading movie..." }));
   clear(reviewsDiv);
-  // Hide review sections entirely until their data arrives.
+  // Hide review sections + close button entirely until data arrives.
+  document.getElementById("closeModalBtn").classList.add("hidden");
   document.getElementById("communityReviewsSection").classList.add("hidden");
   document.getElementById("myReviewSection").classList.add("hidden");
   document.getElementById("myReviewExisting").classList.add("hidden");
@@ -841,8 +853,12 @@ async function openMovie(id) {
   } catch (err) {
     clear(details);
     details.appendChild(el("p", { text: "Could not load movie details." }));
+    document.getElementById("closeModalBtn").classList.remove("hidden");
     return;
   }
+
+  // Movie details rendered — safe to show the close button.
+  document.getElementById("closeModalBtn").classList.remove("hidden");
 
   loadCommunityReviews(id);
   loadMyReview(id);
