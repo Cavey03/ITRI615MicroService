@@ -26,8 +26,17 @@ const app = express();
 // Secure HTTP headers
 app.use(helmet());
 
-// Enable CORS (you can restrict this later)
-app.use(cors());
+// CORS — strict allowlist (same env var as the gateway)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5500,http://127.0.0.1:5500')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+}));
 
 // Parse JSON
 app.use(express.json());
@@ -59,14 +68,19 @@ app.get('/health', (req, res) => {
 });
 
 // ==============================
-// GLOBAL ERROR HANDLER (IMPORTANT)
+// GLOBAL ERROR HANDLER
+// Log the full error internally; never leak internal messages on 5xx
+// responses (could expose DB schema, stack details, etc.).
 // ==============================
 app.use((err, req, res, next) => {
   console.error(err);
 
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-  });
+  const status = err.status || 500;
+  const safeMessage = status >= 500
+    ? 'Internal server error'
+    : (err.message || 'Request failed');
+
+  res.status(status).json({ error: safeMessage });
 });
 
 // ==============================

@@ -9,9 +9,11 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
+// Idle clients in the pool can emit transient errors (network blips, server
+// restarts). Log them and let the pool replace the client — don't crash the
+// whole service, that's overkill and a self-inflicted DoS.
 pool.on('error', (err) => {
-  console.error('Unexpected database error:', err.message);
-  process.exit(1);
+  console.error('Unexpected idle database client error:', err.message);
 });
 
 module.exports = pool;

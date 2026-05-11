@@ -7,15 +7,33 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Helmet with cross-origin friendly settings (so the browser frontend can call us)
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false,
-}));
+// ==============================
+// CORS — strict allowlist
+// ==============================
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5500,http://127.0.0.1:5500')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
-// Allow the frontend to call us from any origin
-app.use(cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow server-to-server / curl / Postman (no Origin header)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+};
 
+app.use(cors(corsOptions));
+
+// ==============================
+// SECURITY HEADERS
+// Helmet defaults — the gateway only returns JSON, so the default CSP and
+// other restrictive headers are safe and a good security signal.
+// ==============================
+app.use(helmet());
+
+// ==============================
+// RATE LIMITING
+// ==============================
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -32,4 +50,5 @@ app.use('/', createProxyMiddleware({
 const GATEWAY_PORT = process.env.GATEWAY_PORT || 8080;
 app.listen(GATEWAY_PORT, () => {
   console.log(`API gateway running on port ${GATEWAY_PORT} → proxying to ${SERVICE_URL}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });

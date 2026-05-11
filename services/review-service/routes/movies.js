@@ -16,7 +16,14 @@ async function tmdb(path, query = {}) {
   const url = new URL(`${TMDB_BASE_URL}${path}`);
   for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
   const response = await fetch(url, { headers: tmdbHeaders });
-  return response.json();
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // Surface TMDB's own status so callers don't think a 200 is success.
+    const err = new Error(data.status_message || 'TMDB request failed');
+    err.status = response.status;
+    throw err;
+  }
+  return data;
 }
 
 // ======================================
@@ -51,9 +58,8 @@ router.get('/search', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: 'Error searching movies'
-    });
+    const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 502;
+    res.status(status).json({ message: 'Error searching movies' });
   }
 });
 
@@ -78,9 +84,8 @@ router.get('/popular', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: 'Error fetching trending movies'
-    });
+    const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 502;
+    res.status(status).json({ message: 'Error fetching trending movies' });
   }
 });
 
@@ -96,9 +101,8 @@ router.get('/:id', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: 'Error fetching movie details'
-    });
+    const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 502;
+    res.status(status).json({ message: 'Error fetching movie details' });
   }
 });
 
@@ -112,9 +116,8 @@ router.get('/:id/reviews', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({
-      message: 'Error fetching community reviews'
-    });
+    const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 502;
+    res.status(status).json({ message: 'Error fetching community reviews' });
   }
 });
 

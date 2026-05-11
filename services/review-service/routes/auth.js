@@ -50,6 +50,11 @@ router.post('/register', async (req, res) => {
     logger.info('User registered', { userId: user.id, username: user.username });
     res.status(201).json({ token, user });
   } catch (err) {
+    // 23505 = unique_violation (e.g. concurrent registration with the same
+    // username/email after the pre-check passed)
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Username or email already in use' });
+    }
     logger.error('Registration failed', { error: err.message });
     res.status(500).json({ error: 'Registration failed' });
   }
