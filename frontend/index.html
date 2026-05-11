@@ -373,25 +373,29 @@
 
     <div id="movieDetails"></div>
 
-    <h3 class="section-title">Community Reviews</h3>
-    <div id="reviews"></div>
-
-    <h3 class="section-title">My Review</h3>
-
-    <div id="myReviewExisting" class="hidden"></div>
-
-    <div id="reviewForm" class="hidden">
-      <select id="rating"></select>
-
-      <textarea id="comment" placeholder="Write your review of this movie..."></textarea>
-
-      <button id="submitReviewBtn">Save</button>
-      <button id="cancelEditBtn" class="hidden" style="margin-left:0.5rem; background-color:#444;">Cancel</button>
-      <div id="reviewError" class="error-msg"></div>
+    <div id="communityReviewsSection" class="hidden">
+      <h3 class="section-title">Community Reviews</h3>
+      <div id="reviews"></div>
     </div>
 
-    <div id="loginPrompt" class="hidden" style="margin-top:1rem; color:#aaa;">
-      Login to leave a review.
+    <div id="myReviewSection" class="hidden">
+      <h3 class="section-title">My Review</h3>
+
+      <div id="myReviewExisting" class="hidden"></div>
+
+      <div id="reviewForm" class="hidden">
+        <select id="rating"></select>
+
+        <textarea id="comment" placeholder="Write your review of this movie..."></textarea>
+
+        <button id="submitReviewBtn">Save</button>
+        <button id="cancelEditBtn" class="hidden" style="margin-left:0.5rem; background-color:#444;">Cancel</button>
+        <div id="reviewError" class="error-msg"></div>
+      </div>
+
+      <div id="loginPrompt" class="hidden" style="margin-top:1rem; color:#aaa;">
+        Login to leave a review.
+      </div>
     </div>
 
   </div>
@@ -817,9 +821,15 @@ async function openMovie(id) {
   clear(details);
   details.appendChild(el("p", { text: "Loading movie..." }));
   clear(reviewsDiv);
+  // Hide review sections entirely until their data arrives.
+  document.getElementById("communityReviewsSection").classList.add("hidden");
+  document.getElementById("myReviewSection").classList.add("hidden");
   document.getElementById("myReviewExisting").classList.add("hidden");
+  document.getElementById("reviewForm").classList.add("hidden");
+  document.getElementById("loginPrompt").classList.add("hidden");
   setReviewError("");
   editingReview = false;
+  myReviewForCurrent = null;
 
   modal.classList.remove("hidden");
 
@@ -844,6 +854,7 @@ async function openMovie(id) {
 async function loadCommunityReviews(movieId) {
   const div = document.getElementById("reviews");
   clear(div);
+  document.getElementById("communityReviewsSection").classList.remove("hidden");
 
   try {
     const res = await fetch(`${API_BASE}/movies/${encodeURIComponent(movieId)}/reviews`);
@@ -878,6 +889,7 @@ async function loadCommunityReviews(movieId) {
 // ============================================================
 async function loadMyReview(movieId) {
   myReviewForCurrent = null;
+  document.getElementById("myReviewSection").classList.remove("hidden");
   const token = getToken();
   if (!token) {
     applyReviewFormVisibility();
