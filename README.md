@@ -307,4 +307,158 @@ These are normal on Windows and can be safely ignored — Git is just normalizin
 
 ## Security Patterns
 
-_(Will be documented in Step 10 of the project plan.)_
+Security is the primary goal of this project. Every layer of the stack — network edge, application logic, database, and frontend rendering — applies an intentional control. This section documents each pattern, the implementation, and **why** the control is in place. Where relevant, OWASP and NIST guidance is cited.
+
+### 1. Defence-in-depth architecture
+
+```
+Browser → API Gateway → Review Service → PostgreSQL + TMDB
+```
+
+**Why:** A single entry point lets us concentrate security controls (rate limiting, CORS, auth headers) at the network edge while keeping internal services simple. Compromising the gateway's external surface still doesn't grant access to the service if the internal-secret check (see §3) fails.
+
+### 2. Transport security (HTTPS + TLS)
+
+- **External traffic**: Render serves both the gateway and the frontend over HTTPS with auto-renewed certificates.
+- **Database**: Neon enforces TLS on every Postgres connection (`sslmode=require` in `DATABASE_URL`).
+
+**Why:** Prevents passive interception and man-in-the-middle attacks on credentials, JWTs, and personal review content. OWASP Top 10 A02 (Cryptographic Failures).
+
+### 3. Service-to-service authentication (internal secret)
+
+The deployed review service has its own public URL on Render's free tier — there is no private networking. To prevent direct access bypassing the gateway, every proxied request carries an `X-Internal-Secret` header attached by the gateway. The review service rejects any request without a matching value (HTTP 403) — except `/health`, which Render's platform must reach for liveness probes.
+
+**Why:** Implements the *zero-trust* principle that network reachability is not a substitute for authentication. Even if the review service URL is leaked, it is unusable without the secret.
+
+### 4. CORS allowlist (both layers)
+
+Both the gateway and the review service read `ALLOWED_ORIGINS` from configuration and reject any cross-origin request whose `Origin` header isn't listed. The default is the local Live Server origin; production uses the deployed frontend URL.
+
+**Why:** Stops malicious sites making authenticated requests on behalf of a logged-in user. Defence in depth: even if the gateway is misconfigured, the service still enforces. OWASP Top 10 A05 (Security Misconfiguration).
+
+### 5. Strict HTTP security headers (Helmet)
+
+Both services use `helmet()` with default settings. This sets `X-Content-Type-Options`, `Strict-Transport-Security`, `Content-Security-Policy`, `Referrer-Policy`, `X-DNS-Prefetch-Control`, and more.
+
+**Why:** Mitigates clickjacking, MIME-type confusion, mixed-content attacks, and forces HTTPS upgrades on supporting clients.
+
+### 6. Rate limiting (both layers)
+
+`express-rate-limit` caps each client IP at 100 requests per 15-minute window. Applied at both the gateway and the review service. Both services call `app.set('trust proxy', 1)` so the rate limiter reads the genuine client IP from `X-Forwarded-For` instead of the upstream proxy's IP.
+
+**Why:** Without `trust proxy`, every request appears to come from the same IP (the proxy), and a single attacker can DoS the service for all users. With it, limits apply per real client. OWASP API Top 10 #4 (Unrestricted Resource Consumption).
+
+### 7. Password hashing (bcrypt)
+
+Passwords are hashed with `bcrypt.hash(password, 12)` before storage. The plaintext is never logged or returned. On login, `bcrypt.compare` performs a constant-time comparison.
+
+**Why:** bcrypt is purpose-built for password hashing — slow, salted, with a tunable work factor. Cost 12 is the modern minimum (OWASP cheat sheet). Constant-time comparison prevents timing-based discovery of valid emails.
+
+### 8. Password complexity (defence in depth)
+
+Both server (Joi regex in `routes/auth.js`) and client (mirrored regex in `index.html`) enforce: 8–72 characters with at least one uppercase, lowercase, digit, and special character.
+
+**Why:** Client-side check gives immediate feedback (UX); server-side check is the actual security boundary (a hostile client can't bypass it). Note: NIST SP 800-63B (2017+) argues *against* mandatory complexity in favour of breached-password checks — this implementation chooses complexity for course alignment but acknowledges modern guidance.
+
+### 9. JSON Web Tokens (JWT)
+
+Tokens are signed with `HS256`, expire after 8 hours, and carry only `{ id, role }`. The verification middleware (`middleware/auth.js`) pins the algorithm to `HS256` explicitly to defeat the `alg: none` and key-confusion attacks.
+
+**Why:** Stateless auth scales without a session store. Pinning the algorithm prevents a classic JWT vulnerability where an attacker forges a token by claiming a different signing algorithm. OWASP API Top 10 #2 (Broken Authentication).
+
+### 10. Role-based access control
+
+The `middleware/roles.js` factory accepts an allowlist of roles (`'user'`, `'admin'`) and rejects callers whose JWT-derived role isn't permitted. Used wherever privileged operations would be appropriate; reserved for future admin features.
+
+**Why:** Coarse-grained authorisation distinct from authentication. Even a logged-in user shouldn't reach admin endpoints.
+
+### 11. Resource ownership (private review data)
+
+`PUT /reviews/:id` and `DELETE /reviews/:id` look up the review's `user_id` and compare to the JWT's `id`. Mismatched users get 403, regardless of role. `GET /reviews/me*` is scoped by the JWT subject — there is no endpoint that returns another user's reviews.
+
+**Why:** Implements the principle of least privilege at the data layer. OWASP API Top 10 #1 (Broken Object Level Authorisation) is the most common API vulnerability — this check is what prevents IDOR.
+
+### 12. Input validation (Joi + express-validator)
+
+Every request body is validated against an explicit schema before reaching business logic. Joi handles registration/login; express-validator covers reviews. Out-of-range ratings, oversized comment bodies, and malformed emails are rejected with 400 before the handler runs.
+
+**Why:** Defence in depth alongside parameterised queries: invalid data never reaches the model layer. OWASP Top 10 A03 (Injection) mitigation starts with not trusting input.
+
+### 13. Parameterised SQL queries
+
+Every query in `models/*.js` uses `$1, $2, ...` parameter placeholders. No string concatenation of user input into SQL.
+
+**Why:** Eliminates SQL injection as a class. OWASP A03.
+
+### 14. Safe DOM rendering (XSS prevention)
+
+The frontend renders movie titles, review bodies, usernames, and TMDB content using `textContent` and `createElement` — never `innerHTML` with template strings. A helper `el()` enforces this pattern. Inline `onclick=` attributes were removed in favour of `addEventListener` so user-supplied strings (movie titles) can never appear in an attribute context.
+
+**Why:** Closes the stored-XSS and HTML-injection paths. A review body containing `<script>` is rendered as literal text, not executed. OWASP Top 10 A03 (Injection — XSS).
+
+### 15. Trailer iframe whitelist
+
+When embedding a YouTube trailer, the video key is validated against the regex `/^[A-Za-z0-9_-]{6,15}$/` before being inserted into the iframe URL. The iframe uses `youtube-nocookie.com` (privacy-friendly variant), `referrerpolicy="strict-origin-when-cross-origin"`, and a minimal `allow` attribute (no `allow-same-origin` or `allow-scripts` sandbox escapes).
+
+**Why:** Even though TMDB controls the data, *trusting* upstream data is a known supply-chain risk. Validating the key shape prevents a malicious or compromised TMDB response from injecting an attacker-controlled URL.
+
+### 16. Error message sanitisation
+
+The global error handler in the review service returns a generic `"Internal server error"` for any HTTP 5xx response. Only 4xx errors (validation, auth) carry specific messages back to the client. The full error is logged server-side via Winston for debugging.
+
+**Why:** Stack traces, database constraint names, and ORM internals can leak schema and runtime details that aid an attacker mapping the system. OWASP Top 10 A09 (Security Logging and Monitoring Failures) — log internally, return generic externally.
+
+### 17. Secrets management
+
+No credentials live in the repository. `.env` and `logs/` are git-ignored. Local development uses a `.env` file (template in `.env.example` with all values blank). Production uses Render's encrypted environment variables and Neon's project-scoped credentials.
+
+**Why:** Avoids the most common cause of leaks — accidental commits. Each environment has independent secrets (separate JWT signing keys, separate database credentials).
+
+### 18. Resilience controls
+
+- **Snapshot pattern in reviews**: when a review is created, the movie's title and poster path are denormalised into the row, so the user's profile page renders even if TMDB is unreachable.
+- **Graceful pool errors**: idle Postgres connection errors are logged but do not crash the service. This prevents a transient network blip from becoming a self-inflicted DoS.
+
+**Why:** Security isn't only about confidentiality — availability is part of the CIA triad. Brittle failure modes (crash on first error) are themselves a vulnerability class.
+
+### 19. Logging (Winston)
+
+All requests are logged with method, path, status, duration, and client IP. Auth events (registration, login success, login failure with reason) are logged separately. Passwords, tokens, and bcrypt hashes are never logged.
+
+**Why:** Detection and forensic visibility. Without logs you cannot tell whether you have been attacked, let alone how. OWASP Top 10 A09.
+
+---
+
+## Threat model summary
+
+| Threat | Mitigation |
+|---|---|
+| Credential interception | TLS everywhere (HTTPS, Postgres SSL) |
+| Password database leak | bcrypt cost 12 |
+| Brute-force login | Rate limiting + generic auth errors (no user enumeration) |
+| JWT forgery (`alg: none`) | Algorithm pinned to HS256 |
+| SQL injection | Parameterised queries everywhere |
+| XSS in reviews | `textContent`-only rendering, no `innerHTML` of user content |
+| CSRF | JWT in `Authorization` header (not cookie) → not auto-attached cross-site |
+| Cross-origin abuse | CORS allowlist on both layers |
+| Direct service access bypassing gateway | Internal secret header required |
+| Information leakage via errors | 5xx responses sanitised; details logged server-side |
+| IDOR (reading another user's review) | Owner check before mutation; no endpoint returns other users' data |
+| Resource exhaustion | Rate limiting per real client IP (`trust proxy`) |
+| Supply chain (TMDB) | Iframe URL validated against strict regex before insertion |
+| Secrets in version control | `.gitignore`, `.env.example` only, Render env vars for prod |
+
+---
+
+## Deployment
+
+The application is deployed across three free-tier services:
+
+| Component | Platform | Notes |
+|---|---|---|
+| Frontend (static) | Render Static Site | Auto-deploys on push |
+| API Gateway | Render Web Service | Auto-deploys on push; sleeps after 15 min idle |
+| Review Service | Render Web Service | Same; protected by internal secret |
+| Database | Neon Postgres | Free tier, always-on, TLS required |
+
+Environment variables are managed through the Render and Neon dashboards. The frontend auto-detects local vs. deployed via `location.hostname` and points at the correct API base.
